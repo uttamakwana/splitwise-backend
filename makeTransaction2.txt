@@ -1,0 +1,69 @@
+import { User } from "../../models/users.js";
+
+export const makeTransaction2 = async (req, res) => {
+  const { user_id, transaction } = req.body;
+
+  const USER = await User.findById(user_id);
+
+  const allFriendsExist = transaction.paidFor.every((id) =>
+    USER.friends.some((friend) => friend.id.toString() === id)
+  );
+
+  if (allFriendsExist) {
+    const { amount, description, paidFor, friends } = transaction;
+    USER.transactions.push(transaction);
+
+    friends.map(async (friend) => {
+      const myFriend = await User.findById(friend.id);
+      const mySelfInMyFriend = myFriend.friends.find(
+        (f) => f.id.toString() === user_id
+      );
+      mySelfInMyFriend.amount -= friend.share;
+      mySelfInMyFriend.transactions.push({
+        share: friend.share,
+        description: friend.description,
+      });
+
+      // const thatFriendInMyFriendList = USER.friends.find(
+      //   (f) => f.id.toString() === friend.id
+      // );
+
+      const thatFriendInMyFriendList = USER.friends.find(
+        (f) => f.id.toString() === friend.id
+      );
+
+      console.log(thatFriendInMyFriendList);
+      if (thatFriendInMyFriendList) {
+        thatFriendInMyFriendList.amount += friend.share;
+        thatFriendInMyFriendList.transactions.push({
+          share: friend.share,
+          description: friend.description,
+        });
+        await USER.save();
+      } else {
+        console.log(`Friend with ${friend.id} doesn't exist!`);
+      }
+
+      // USER.friends.forEach(async (f) => {
+      //   if (f.id.toString() === friend.id.toString()) {
+      //     console.count(f);
+      //     f.amount += friend.share;
+      //     f.transactions.push({
+      //       share: friend.share,
+      //       description: friend.description,
+      //     });
+      //   } else {
+      //     console.log("Friend not found!");
+      //   }
+      // });
+
+      // thatFriendInMyFriendList.amount += friend.share;
+      await myFriend.save();
+    });
+    return res.json({ USER });
+  } else {
+    return res
+      .status(402)
+      .json({ sucess: false, message: "Some friends may not exist!" });
+  }
+};
